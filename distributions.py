@@ -1,3 +1,4 @@
+from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Union, List, Callable, Tuple
 
@@ -8,12 +9,18 @@ Num = Union[int, float]
 
 
 class Distribution(ABC):
+    """Define a probability distribution."""
     KEEP = False
 
     def __init__(self):
         self.sampled = None
 
     def sample(self, n: int) -> Union[np.ndarray, list]:
+        """Method to sample from distribution.
+        
+        This method shouldn't be overridden, the one to override in order
+        to define the distribution sample is get_sample.
+        """
         if self.sampled is not None and Distribution.KEEP:
             return self.sampled
 
@@ -24,6 +31,11 @@ class Distribution(ABC):
 
     @abstractmethod
     def get_sample(self, n: int) -> Union[np.ndarray, list]:
+        """Sample the distribution.
+        
+        This method has to be overriden by subclasses in order to define
+        the distribution itself.
+        """
         raise NotImplementedError("sample not implemented")
 
     @staticmethod
@@ -40,6 +52,8 @@ class Distribution(ABC):
 
 
 class Distribution2D(Distribution):
+    """Define a two dimensional probability distribution."""
+
     def __init__(self, d1: Distribution, d2: Distribution):
         super().__init__()
         self.d1 = d1
@@ -50,6 +64,8 @@ class Distribution2D(Distribution):
 
 
 class Uniform(Distribution):
+    """Uniform probability distribution."""
+
     def __init__(self, a: Num, b: Num):
         super().__init__()
         self.a = a
@@ -60,6 +76,8 @@ class Uniform(Distribution):
 
 
 class Normal(Distribution):
+    """Gaussian probability distribution."""
+
     def __init__(self, mean: Num, std: Num):
         super().__init__()
         self.mean = mean
@@ -70,7 +88,9 @@ class Normal(Distribution):
 
 
 class RandomVar:
-    def __init__(self, dist: Distribution=None):
+    """Defines a random variable with a given distribution."""
+
+    def __init__(self, dist: Distribution):
         self._dist = dist
 
     @property
@@ -102,11 +122,15 @@ class RandomVar:
 
 
 class Joint(RandomVar):
+    """Defines a random variable that has a joint distribution.
+    
+    The Joint distribution is defined by two previous random variables.
+    """
+
     def __init__(self, x: RandomVar, y: RandomVar):
-        super().__init__()
+        super().__init__(Distribution2D(x.dist, y.dist))
         self._x = x
         self._y = y
-        self._dist = Distribution2D(x.dist, y.dist)
     
     def sample(self, n: int) -> Union[np.ndarray, list]:
         Distribution.KEEP = True

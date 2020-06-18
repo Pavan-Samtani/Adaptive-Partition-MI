@@ -1,6 +1,10 @@
-from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import Union, List, Callable, Tuple
+
 import numpy as np
+
+
+Num = Union[int, float]
 
 
 class Distribution(ABC):
@@ -9,7 +13,7 @@ class Distribution(ABC):
     def __init__(self):
         self.sampled = None
 
-    def sample(self, n):
+    def sample(self, n: int) -> Union[np.ndarray, list]:
         if self.sampled is not None and Distribution.KEEP:
             return self.sampled
 
@@ -19,49 +23,49 @@ class Distribution(ABC):
             return samples
 
     @abstractmethod
-    def get_sample(self, n):
+    def get_sample(self, n: int) -> Union[np.ndarray, list]:
         raise NotImplementedError("sample not implemented")
 
     @staticmethod
-    def multiply(*dists):
+    def multiply(*dists: Distribution) -> Distribution:
         return type("MultDist", (Distribution, object), {"get_sample": lambda self, n: np.prod([d.sample(n) for d in dists], axis=0)})()
 
     @staticmethod
-    def sum(*dists):
+    def sum(*dists: Distribution) -> Distribution:
         return type("SumDist", (Distribution, object), {"get_sample": lambda self, n: np.sum([d.sample(n) for d in dists], axis=0)})()
 
     @staticmethod
-    def operation(dist, oper):
+    def operation(dist: Distribution, oper: Callable) -> Distribution:
         return type("OpDist", (Distribution, object), {"get_sample": lambda self, n: oper(dist.sample(n))})()
 
 
 class Distribution2D(Distribution):
-    def __init__(self, d1, d2):
+    def __init__(self, d1: Distribution, d2: Distribution):
         super().__init__()
         self.d1 = d1
         self.d2 = d2
 
-    def get_sample(self, n):
+    def get_sample(self, n: int) -> Tuple(Union[np.ndarray, list], Union[np.ndarray, list]):
         return self.d1.sample(n), self.d2.sample(n)
 
 
 class Uniform(Distribution):
-    def __init__(self, a, b):
+    def __init__(self, a: Num, b: Num):
         super().__init__()
         self.a = a
         self.b = b
 
-    def get_sample(self, n):
+    def get_sample(self, n: int) -> np.ndarray:
         return np.random.uniform(self.a, self.b, size=n)
 
 
 class Normal(Distribution):
-    def __init__(self, mean, std):
+    def __init__(self, mean: Num, std: Num):
         super().__init__()
         self.mean = mean
         self.std = std
 
-    def get_sample(self, n):
+    def get_sample(self, n: int) -> np.ndarray:
         return np.random.normal(self.mean, self.std, size=n)
 
 
@@ -73,7 +77,7 @@ class RandomVar:
     def dist(self):
         return self._dist
 
-    def sample(self, n):
+    def sample(self, n: int) -> Union[np.ndarray, list]:
         try:
             return self.dist.sample(n)
 
@@ -85,15 +89,15 @@ class RandomVar:
                 raise
 
     @staticmethod
-    def multiply(*rvars):
+    def multiply(*rvars: RandomVar) -> RandomVar:
         return RandomVar(Distribution.multiply(*[rvar.dist for rvar in rvars]))
 
     @staticmethod
-    def sum(*rvars):
+    def sum(*rvars: RandomVar) -> RandomVar:
         return RandomVar(Distribution.sum(*[rvar.dist for rvar in rvars]))
 
     @staticmethod
-    def operation(rvar, oper):
+    def operation(rvar: RandomVar, oper: Callable) -> RandomVar:
         return RandomVar(Distribution.operation(rvar.dist, oper))
 
 
@@ -104,7 +108,7 @@ class Joint(RandomVar):
         self._y = y
         self._dist = Distribution2D(x.dist, y.dist)
     
-    def sample(self, n):
+    def sample(self, n: int) -> Union[np.ndarray, list]:
         Distribution.KEEP = True
         x, y = self.dist.sample(n)
         Distribution.KEEP = False

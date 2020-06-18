@@ -59,8 +59,8 @@ class Distribution2D(Distribution):
         self.d1 = d1
         self.d2 = d2
 
-    def get_sample(self, n: int) -> Tuple(Union[np.ndarray, list], Union[np.ndarray, list]):
-        return self.d1.sample(n), self.d2.sample(n)
+    def get_sample(self, n: int) -> list:
+        return list(zip(self.d1.sample(n), self.d2.sample(n)))
 
 
 class Uniform(Distribution):
@@ -132,12 +132,12 @@ class Joint(RandomVar):
         self._x = x
         self._y = y
     
-    def sample(self, n: int) -> Union[np.ndarray, list]:
+    def sample(self, n: int) -> np.ndarray:
         Distribution.KEEP = True
-        x, y = self.dist.sample(n)
+        xy = self.dist.sample(n)
         Distribution.KEEP = False
 
-        return x, y
+        return np.array(xy)
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
@@ -148,8 +148,8 @@ if __name__ == "__main__":
 
     xy = Joint(x, y)
 
-    xs, ys = xy.sample(100)
+    xy_samples = xy.sample(100)
 
-    plt.plot(xs, ys, 'o')
+    plt.plot(*list(zip(*xy_samples)), 'o')
     plt.plot(x.sample(100), y.sample(100), 'o')
     plt.show()

@@ -19,6 +19,8 @@ class CustomRect(collections.LineCollection):
 class SmartRectangle:
 
     def __init__(self, xlim, ylim, plane):
+        if len(xlim) != 2 or len(ylim) != 2:
+            raise ValueError("xlim or ylim cannot have length different than 2")
         self.xlim = xlim
         self.ylim = ylim
         self.plane = plane
@@ -59,6 +61,7 @@ class AdaptiveAlgorithm:
         self.sample = sample
         self.plane = Plane(sample)
         self.current_partition = None
+        self.delta = delta
         self.r = r
         self.s = s
 
@@ -66,14 +69,15 @@ class AdaptiveAlgorithm:
         # Generate equiprobable partition
         xmarg, ymarg = list(zip(*self.plane.sample))
 
-        xpartition = self.plane.xlim
-        ypartition = self.plane.ylim
+        xpartition = self.plane.xlim[:]
+        ypartition = self.plane.ylim[:]
 
         for j in range(1, self.r):
             xpartition.insert(j, np.quantile(xmarg, j / self.r))
             ypartition.insert(j, np.quantile(ymarg, j / self.r))
 
         self.current_partition = self.points_to_partition(xpartition, ypartition)
+        self.rfinal = []
 
     def points_to_partition(self, xpart, ypart):
         smart_rects = []
@@ -83,10 +87,33 @@ class AdaptiveAlgorithm:
 
         return smart_rects
 
-    def plot_partition(self, ax):
-        for rect in self.current_partition:
+    def plot_partition(self, ax, partition):
+        for rect in partition:
             r_fig = rect.get_plot_rect()
             ax.add_collection(r_fig)
+
+    def plot_data(self, ax):
+        ax.plot(*list(zip(*self.sample)), 'o')
+
+    def rectangle_subpartition(self, rect, partition_size):
+        xmarg_rect = SmartRectangle(rect.xlim, self.plane.ylim, self.plane)
+        ymarg_rect = SmartRectangle(self.plane.xlim, rect.ylim, self.plane)
+
+        margx, _ = list(zip(*xmarg_rect.samples_inside))
+        _, margy = list(zip(*ymarg_rect.samples_inside))
+
+        condx = np.array(margx)
+        condy = np.array(margy)
+
+        xpartition = rect.xlim[:]
+        ypartition = rect.ylim[:]
+
+        for j in range(1, partition_size):
+            xpartition.insert(j, np.quantile(condx, j / partition_size))
+            ypartition.insert(j, np.quantile(condy, j / partition_size))
+
+        return self.points_to_partition(xpartition, ypartition), xmarg_rect, ymarg_rect
+
 
     def run(self):
         # Step 0: Generate first partition
@@ -95,23 +122,45 @@ class AdaptiveAlgorithm:
         # While partition is changing
         while True:
             # Step 1: Generate next partition
-            r_k = self.current_partition
+            r_k = self.current_partition[:]
             r_next = []
-            for rect in r_k:
-                if rect.samples_inside.size == 0:
-                    r_next.append(rect)
 
+            # For each rectangle in current partition
+            for rect in r_k:
+                # If the rectangle doesnt have samples inside, dont divide it
+                if len(rect.samples_inside) == 0:
+                    # r_next.append(rect)
+                    self.rfinal.append(rect)
+
+                # Otherwise...
                 else:
-                    # Continue algorithm
-                    pass
+                    # Calculate subpartition of rectangle with s parameter
+                    subp, xmarg_rect, ymarg_rect = self.rectangle_subpartition(rect, self.s)
+
+                    joint_abl = np.array([len(r.samples_inside) / len(rect.samples_inside) for r in subp])
+                    ARl_rects = [SmartRectangle(r.xlim, self.plane.ylim, self.plane) for r in subp]
+                    RBl_rects = [SmartRectangle(self.plane.xlim, r.ylim, self.plane) for r in subp]
+
+                    marginal_a = np.array([len(r.samples_inside) / len(xmarg_rect.samples_inside) for r in ARl_rects])
+                    marginal_b = np.array([len(r.samples_inside) / len(ymarg_rect.samples_inside) for r in RBl_rects])
+
+                    divergence = np.nansum(joint_abl * np.log(joint_abl / (marginal_a * marginal_b)))
+
+                    if divergence > self.delta:
+                        r_subp, _, _ = self.rectangle_subpartition(rect, self.r)
+                        r_next.extend(r_subp)
+                    
+                    else:
+                        # r_next.append(rect)
+                        self.rfinal.append(rect)
 
             self.current_partition = r_next
 
             # Step 2: End if partition didn't change in last iteration
-            if np.array_equal(r_next, r_k):
+            if len(self.current_partition) == 0: #np.array_equal(r_next, r_k):
                 break
 
-        return self.current_partition
+        return self.rfinal
 
 
 if __name__ == "__main__":
@@ -124,17 +173,17 @@ if __name__ == "__main__":
 
     xy = Joint(x, y)
 
-    xy_sample = xy.sample(100)
+    xy_sample = xy.sample(1000)
 
-    delta = 0.1
+    delta = 0.03
     r = 2
     s = 2
 
     # Adaptive algorithm
-    # adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s)
-    # final_partition = adaptive_algorithm.run()
+    adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s)
+    final_partition = adaptive_algorithm.run()
 
-    # fig, ax = plt.subplots()
-    # adaptive_algorithm.plot_partition(ax)
-    # ax.plot(*list(zip(*xy_sample)), 'o')
-    # plt.show()
+    fig, ax = plt.subplots()
+    adaptive_algorithm.plot_partition(ax, final_partition)
+    adaptive_algorithm.plot_data(ax)
+    plt.show()

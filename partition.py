@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import Union, List
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import patches
 
 
 class SmartRectangle:
@@ -31,12 +33,13 @@ class Plane:
         ylimit = (self.sample[:, 1] >= ylim[0]) & (self.sample[:, 1] <= ylim[1])
         return self.sample[xlimit & ylimit]
 
-class AdaptivePartition:
 
-    def __init__(self, plane, r, s):
-        self.plane = plane
-        self.current_partition = []
-        self.changing = True
+class AdaptiveAlgorithm:
+
+    def __init__(self, sample, delta, r, s):
+        self.sample = sample
+        self.plane = Plane(sample)
+        self.current_partition = None
         self.r = r
         self.s = s
 
@@ -51,8 +54,7 @@ class AdaptivePartition:
             xpartition.insert(j, np.quantile(xmarg, j / self.r))
             ypartition.insert(j, np.quantile(ymarg, j / self.r))
 
-        partition = self.points_to_partition(xpartition, ypartition)
-        return partition
+        self.current_partition = self.points_to_partition(xpartition, ypartition)
 
     def points_to_partition(self, xpart, ypart):
         smart_rects = []
@@ -62,30 +64,31 @@ class AdaptivePartition:
 
         return smart_rects
 
-    def update_partition(self):
-        pass
-
-
-class AdaptiveAlgorithm:
-
-    def __init__(self, sample, delta, r, s):
-        self.sample = sample
-        self.plane = Plane(sample)
-        self.adaptive_partition = AdaptivePartition(plane, r, s)
-
     def run(self):
         # Step 0: Generate first partition
-        self.adaptive_partition.initialize_partition()
+        self.initialize_partition()
 
         # While partition is changing
-        while self.adaptive_partition.changing:
+        while True:
             # Step 1: Generate next partition
-            r_k = self.adaptive_partition.current_partition
+            r_k = self.current_partition
+            r_next = []
+            for rect in r_k:
+                if rect.samples_inside.size == 0:
+                    r_next.append(rect)
+
+                else:
+                    # Continue algorithm
+                    pass
+
+                self.current_partition = r_next
 
 
-        # Step 2: End if partition didn't change in last iteration
-        self.final_partition = self.adaptive_partition.current_partition
+            # Step 2: End if partition didn't change in last iteration
+            if np.array_equal(r_next, r_k):
+                break
 
+        return self.current_partition
 
 
 if __name__ == "__main__":
@@ -104,12 +107,11 @@ if __name__ == "__main__":
     r = 2
     s = 2
 
-    # Adaptive partition
-    plane = Plane(xy_sample)
-    apartition = AdaptivePartition(plane, r, s)
-
-    for r in apartition.initialize_partition():
-        print(r.xlim, r.ylim, r.samples_inside)
-
+    # Adaptive algorithm
     # adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s)
     # final_partition = adaptive_algorithm.run()
+
+    # fig, ax = plt.subplots()
+    # adaptive_algorithm.plot_partition(ax)
+    # ax.plot(*list(zip(*xy_sample)), 'o')
+    # plt.show()

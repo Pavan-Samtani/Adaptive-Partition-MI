@@ -2,7 +2,18 @@ from __future__ import annotations
 from typing import Union, List
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib import patches
+from matplotlib import collections
+
+
+class CustomRect(collections.LineCollection):
+    def __init__(self, xlim, ylim, *args, **kwargs):
+        lines = [
+            [(xlim[0], ylim[0]), (xlim[0], ylim[1])],
+            [(xlim[0], ylim[0]), (xlim[1], ylim[0])],
+            [(xlim[0], ylim[1]), (xlim[1], ylim[1])],
+            [(xlim[1], ylim[0]), (xlim[1], ylim[1])]
+        ]
+        super().__init__(lines, *args, **kwargs)
 
 
 class SmartRectangle:
@@ -15,7 +26,15 @@ class SmartRectangle:
     
     def split(self) -> List[SmartRectangle]:
         pass
+        # return [
+        #     SmartRectangle([self.xlim[0], sum(self.xlim) / 2], self.ylim, self.plane),
+        #     SmartRectangle([sum(self.xlim) / 2, self.xlim[1]], self.ylim, self.plane),
+        #     SmartRectangle(self.xlim, [self.ylim[0], sum(self.ylim) / 2], self.plane),
+        #     SmartRectangle(self.xlim, [sum(self.ylim) / 2, self.ylim[1]], self.plane),
+        # ]
 
+    def get_plot_rect(self):
+        return CustomRect(self.xlim, self.ylim)
 
 class Plane:
 
@@ -64,6 +83,11 @@ class AdaptiveAlgorithm:
 
         return smart_rects
 
+    def plot_partition(self, ax):
+        for rect in self.current_partition:
+            r_fig = rect.get_plot_rect()
+            ax.add_collection(r_fig)
+
     def run(self):
         # Step 0: Generate first partition
         self.initialize_partition()
@@ -81,8 +105,7 @@ class AdaptiveAlgorithm:
                     # Continue algorithm
                     pass
 
-                self.current_partition = r_next
-
+            self.current_partition = r_next
 
             # Step 2: End if partition didn't change in last iteration
             if np.array_equal(r_next, r_k):

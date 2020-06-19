@@ -138,18 +138,3 @@ class Joint(RandomVar):
         Distribution.KEEP = False
 
         return np.array(xy)
-
-if __name__ == "__main__":
-    from matplotlib import pyplot as plt
-
-    U = RandomVar(Uniform(-np.pi, np.pi))
-    x = RandomVar.operation(U, np.cos)
-    y = RandomVar.operation(U, np.sin)
-
-    xy = Joint(x, y)
-
-    xy_samples = xy.sample(100)
-
-    plt.plot(*list(zip(*xy_samples)), 'o')
-    plt.plot(x.sample(100), y.sample(100), 'o')
-    plt.show()

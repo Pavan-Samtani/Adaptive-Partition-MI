@@ -21,19 +21,11 @@ class SmartRectangle:
     def __init__(self, xlim, ylim, plane):
         if len(xlim) != 2 or len(ylim) != 2:
             raise ValueError("xlim or ylim cannot have length different than 2")
+
         self.xlim = xlim
         self.ylim = ylim
         self.plane = plane
         self.samples_inside = plane.get_samples(xlim, ylim)
-    
-    def split(self) -> List[SmartRectangle]:
-        pass
-        # return [
-        #     SmartRectangle([self.xlim[0], sum(self.xlim) / 2], self.ylim, self.plane),
-        #     SmartRectangle([sum(self.xlim) / 2, self.xlim[1]], self.ylim, self.plane),
-        #     SmartRectangle(self.xlim, [self.ylim[0], sum(self.ylim) / 2], self.plane),
-        #     SmartRectangle(self.xlim, [sum(self.ylim) / 2, self.ylim[1]], self.plane),
-        # ]
 
     def get_plot_rect(self):
         return CustomRect(self.xlim, self.ylim)
@@ -92,8 +84,8 @@ class AdaptiveAlgorithm:
             r_fig = rect.get_plot_rect()
             ax.add_collection(r_fig)
 
-    def plot_data(self, ax):
-        ax.plot(*list(zip(*self.sample)), 'o')
+    def plot_data(self, ax, *args, **kwargs):
+        ax.plot(*list(zip(*self.sample)), 'o', *args, **kwargs)
 
     def rectangle_subpartition(self, rect, partition_size):
         xmarg_rect = SmartRectangle(rect.xlim, self.plane.ylim, self.plane)
@@ -114,7 +106,6 @@ class AdaptiveAlgorithm:
 
         return self.points_to_partition(xpartition, ypartition), xmarg_rect, ymarg_rect
 
-
     def run(self):
         # Step 0: Generate first partition
         self.initialize_partition()
@@ -129,7 +120,6 @@ class AdaptiveAlgorithm:
             for rect in r_k:
                 # If the rectangle doesnt have samples inside, dont divide it
                 if len(rect.samples_inside) == 0:
-                    # r_next.append(rect)
                     self.rfinal.append(rect)
 
                 # Otherwise...
@@ -151,39 +141,12 @@ class AdaptiveAlgorithm:
                         r_next.extend(r_subp)
                     
                     else:
-                        # r_next.append(rect)
                         self.rfinal.append(rect)
 
             self.current_partition = r_next
 
             # Step 2: End if partition didn't change in last iteration
-            if len(self.current_partition) == 0: #np.array_equal(r_next, r_k):
+            if len(self.current_partition) == 0:
                 break
 
         return self.rfinal
-
-
-if __name__ == "__main__":
-    from distributions import Uniform, RandomVar, Joint
-    from matplotlib import pyplot as plt
-
-    U = RandomVar(Uniform(-np.pi, np.pi))
-    x = RandomVar.operation(U, np.cos)
-    y = RandomVar.operation(U, np.sin)
-
-    xy = Joint(x, y)
-
-    xy_sample = xy.sample(1000)
-
-    delta = 0.03
-    r = 2
-    s = 2
-
-    # Adaptive algorithm
-    adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s)
-    final_partition = adaptive_algorithm.run()
-
-    fig, ax = plt.subplots()
-    adaptive_algorithm.plot_partition(ax, final_partition)
-    adaptive_algorithm.plot_data(ax)
-    plt.show()

@@ -1,4 +1,5 @@
-from __future__ import annotations
+
+# from __future__ import annotations
 from typing import Union, List
 import numpy as np
 from matplotlib import pyplot as plt
@@ -35,27 +36,28 @@ class Plane:
     def __init__(self, sample):
         self.sample = sample
 
-        xmin, ymin = np.min(sample, axis=0)
+        xmin, ymin = np.min(sample, axis=0) - 1e-6
         xmax, ymax = np.max(sample, axis=0)
 
         self.xlim = [xmin, xmax]
         self.ylim = [ymin, ymax]
 
     def get_samples(self, xlim, ylim):
-        xlimit = (self.sample[:, 0] >= xlim[0]) & (self.sample[:, 0] <= xlim[1])
-        ylimit = (self.sample[:, 1] >= ylim[0]) & (self.sample[:, 1] <= ylim[1])
+        xlimit = (self.sample[:, 0] > xlim[0]) & (self.sample[:, 0] <= xlim[1])
+        ylimit = (self.sample[:, 1] > ylim[0]) & (self.sample[:, 1] <= ylim[1])
         return self.sample[xlimit & ylimit]
 
 
 class AdaptiveAlgorithm:
 
-    def __init__(self, sample, delta, r, s):
+    def __init__(self, sample, delta, r, s, use_chi2=True):
         self.sample = sample
         self.plane = Plane(sample)
         self.current_partition = None
         self.delta = delta
         self.r = r
         self.s = s
+        self.use_chi2 = use_chi2
 
     def initialize_partition(self):
         # Generate equiprobable partition
@@ -125,22 +127,30 @@ class AdaptiveAlgorithm:
                 # Otherwise...
                 else:
                     # Calculate subpartition of rectangle with s parameter
-                    subp, xmarg_rect, ymarg_rect = self.rectangle_subpartition(rect, self.s)
+                    added = False
+                    for val in [self.s, self.s ** 2]:
+                        subp, xmarg_rect, ymarg_rect = self.rectangle_subpartition(rect, val)
 
-                    joint_abl = np.array([len(r.samples_inside) / len(rect.samples_inside) for r in subp])
-                    ARl_rects = [SmartRectangle(r.xlim, self.plane.ylim, self.plane) for r in subp]
-                    RBl_rects = [SmartRectangle(self.plane.xlim, r.ylim, self.plane) for r in subp]
+                        joint_abl = np.array([len(r.samples_inside) / len(rect.samples_inside) for r in subp])
+                        ARl_rects = [SmartRectangle(r.xlim, self.plane.ylim, self.plane) for r in subp]
+                        RBl_rects = [SmartRectangle(self.plane.xlim, r.ylim, self.plane) for r in subp]
 
-                    marginal_a = np.array([len(r.samples_inside) / len(xmarg_rect.samples_inside) for r in ARl_rects])
-                    marginal_b = np.array([len(r.samples_inside) / len(ymarg_rect.samples_inside) for r in RBl_rects])
+                        marginal_a = np.array([len(r.samples_inside) / len(xmarg_rect.samples_inside) for r in ARl_rects])
+                        marginal_b = np.array([len(r.samples_inside) / len(ymarg_rect.samples_inside) for r in RBl_rects])
 
-                    divergence = np.nansum(joint_abl * np.log(joint_abl / (marginal_a * marginal_b)))
+                        if self.use_chi2:
+                            estimate = np.nansum((1 / (marginal_a * marginal_b)) * (joint_abl - (marginal_a * marginal_b)) ** 2)
 
-                    if divergence > self.delta:
-                        r_subp, _, _ = self.rectangle_subpartition(rect, self.r)
-                        r_next.extend(r_subp)
+                        else:
+                            estimate = np.nansum(joint_abl * np.log(joint_abl / (marginal_a * marginal_b)))
+
+                        if estimate >= self.delta(val):
+                            r_subp, _, _ = self.rectangle_subpartition(rect, self.r)
+                            r_next.extend(r_subp)
+                            added = True
+                            break
                     
-                    else:
+                    if not added:
                         self.rfinal.append(rect)
 
             self.current_partition = r_next
@@ -148,5 +158,43 @@ class AdaptiveAlgorithm:
             # Step 2: End if partition didn't change in last iteration
             if len(self.current_partition) == 0:
                 break
+
+        return self.rfinal
+
+
+class NonAdaptivePartition:
+
+    def __init__(self, sample, bins: list):
+
+        self.bins = bins
+        self.plane = Plane(sample)
+        self.current_partition = None
+
+    def initialize_partition(self):
+        # Generate equiprobable partition
+        xmarg, ymarg = list(zip(*self.plane.sample))
+
+        xpartition = self.plane.xlim[:]
+        ypartition = self.plane.ylim[:]
+
+        for j in range(1, self.bins[0]):
+            xpartition.insert(j, np.quantile(xmarg, j / self.bins[0]))
+
+        for j in range(1, self.bins[1]):
+            ypartition.insert(j, np.quantile(ymarg, j / self.bins[1]))
+
+        self.rfinal =  self.points_to_partition(xpartition, ypartition)
+
+    def points_to_partition(self, xpart, ypart):
+        smart_rects = []
+        for ix in range(len(xpart) - 1):
+            for iy in range(len(ypart) - 1):
+                smart_rects.append(SmartRectangle([xpart[ix], xpart[ix + 1]], [ypart[iy], ypart[iy + 1]], self.plane))
+
+        return smart_rects
+
+    def run(self):
+
+        self.initialize_partition()
 
         return self.rfinal

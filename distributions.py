@@ -1,4 +1,5 @@
-from __future__ import annotations
+
+# from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Union, List, Callable, Tuple
 
@@ -39,15 +40,15 @@ class Distribution(ABC):
         raise NotImplementedError("sample not implemented")
 
     @staticmethod
-    def multiply(*dists: Distribution) -> Distribution:
+    def multiply(*dists: 'Distribution') -> 'Distribution':
         return type("MultDist", (Distribution, object), {"get_sample": lambda self, n: np.prod([d.sample(n) for d in dists], axis=0)})()
 
     @staticmethod
-    def sum(*dists: Distribution) -> Distribution:
+    def sum(*dists: 'Distribution') -> 'Distribution':
         return type("SumDist", (Distribution, object), {"get_sample": lambda self, n: np.sum([d.sample(n) for d in dists], axis=0)})()
 
     @staticmethod
-    def operation(dist: Distribution, oper: Callable) -> Distribution:
+    def operation(dist: 'Distribution', oper: Callable) -> 'Distribution':
         return type("OpDist", (Distribution, object), {"get_sample": lambda self, n: oper(dist.sample(n))})()
 
 
@@ -87,6 +88,18 @@ class Normal(Distribution):
         return np.random.normal(self.mean, self.std, size=n)
 
 
+class MultivariateNormal(Distribution):
+    """Multivariate Gaussian probability distribution."""    
+
+    def __init__(self, mean: np.ndarray, cov: np.ndarray):
+        super().__init__()
+        self.mean = mean
+        self.cov = cov
+
+    def get_sample(self, n: int) -> np.ndarray:
+        return np.random.multivariate_normal(self.mean, self.cov, size=n)
+
+
 class RandomVar:
     """Defines a random variable with a given distribution."""
 
@@ -109,15 +122,15 @@ class RandomVar:
                 raise
 
     @staticmethod
-    def multiply(*rvars: RandomVar) -> RandomVar:
+    def multiply(*rvars: 'RandomVar') -> 'RandomVar':
         return RandomVar(Distribution.multiply(*[rvar.dist for rvar in rvars]))
 
     @staticmethod
-    def sum(*rvars: RandomVar) -> RandomVar:
+    def sum(*rvars: 'RandomVar') -> 'RandomVar':
         return RandomVar(Distribution.sum(*[rvar.dist for rvar in rvars]))
 
     @staticmethod
-    def operation(rvar: RandomVar, oper: Callable) -> RandomVar:
+    def operation(rvar: 'RandomVar', oper: Callable) -> 'RandomVar':
         return RandomVar(Distribution.operation(rvar.dist, oper))
 
 

@@ -36,28 +36,27 @@ class Plane:
     def __init__(self, sample):
         self.sample = sample
 
-        xmin, ymin = np.min(sample, axis=0) - 1e-6
-        xmax, ymax = np.max(sample, axis=0)
+        xmin, ymin = np.min(sample, axis=0)
+        xmax, ymax = np.max(sample, axis=0) + 1e-6
 
         self.xlim = [xmin, xmax]
         self.ylim = [ymin, ymax]
 
     def get_samples(self, xlim, ylim):
-        xlimit = (self.sample[:, 0] > xlim[0]) & (self.sample[:, 0] <= xlim[1])
-        ylimit = (self.sample[:, 1] > ylim[0]) & (self.sample[:, 1] <= ylim[1])
+        xlimit = (self.sample[:, 0] >= xlim[0]) & (self.sample[:, 0] < xlim[1])
+        ylimit = (self.sample[:, 1] >= ylim[0]) & (self.sample[:, 1] < ylim[1])
         return self.sample[xlimit & ylimit]
 
 
 class AdaptiveAlgorithm:
 
-    def __init__(self, sample, delta, r, s, use_chi2=True):
+    def __init__(self, sample, delta, r, s):
         self.sample = sample
         self.plane = Plane(sample)
         self.current_partition = None
         self.delta = delta
         self.r = r
         self.s = s
-        self.use_chi2 = use_chi2
 
     def initialize_partition(self):
         # Generate equiprobable partition
@@ -103,13 +102,13 @@ class AdaptiveAlgorithm:
         ypartition = rect.ylim[:]
 
         for j in range(1, partition_size):
-            xpartition.insert(j, np.quantile(condx, j / partition_size))
-            ypartition.insert(j, np.quantile(condy, j / partition_size))
+            xpartition.insert(j, np.quantile(condx, j / partition_size, interpolation='lower'))
+            ypartition.insert(j, np.quantile(condy, j / partition_size, interpolation='lower'))
 
         return self.points_to_partition(xpartition, ypartition), xmarg_rect, ymarg_rect
 
     def run(self):
-        # Step 0: Generate first partition
+
         self.initialize_partition()
 
         # While partition is changing
@@ -121,7 +120,7 @@ class AdaptiveAlgorithm:
             # For each rectangle in current partition
             for rect in r_k:
                 # If the rectangle doesnt have samples inside, dont divide it
-                if len(rect.samples_inside) == 0:
+                if len(rect.samples_inside) <= 2:
                     self.rfinal.append(rect)
 
                 # Otherwise...
@@ -129,24 +128,24 @@ class AdaptiveAlgorithm:
                     # Calculate subpartition of rectangle with s parameter
                     added = False
                     for val in [self.s, self.s ** 2]:
-                        subp, xmarg_rect, ymarg_rect = self.rectangle_subpartition(rect, val)
+                        e_val = len(rect.samples_inside) / (val ** 2)
+                        subp, __, __ = self.rectangle_subpartition(rect, val)
 
-                        joint_abl = np.array([len(r.samples_inside) / len(rect.samples_inside) for r in subp])
-                        ARl_rects = [SmartRectangle(r.xlim, self.plane.ylim, self.plane) for r in subp]
-                        RBl_rects = [SmartRectangle(self.plane.xlim, r.ylim, self.plane) for r in subp]
+                        num_samples_child = np.array([len(r.samples_inside) for r in subp])
 
-                        marginal_a = np.array([len(r.samples_inside) / len(xmarg_rect.samples_inside) for r in ARl_rects])
-                        marginal_b = np.array([len(r.samples_inside) / len(ymarg_rect.samples_inside) for r in RBl_rects])
-
-                        if self.use_chi2:
-                            estimate = np.nansum((1 / (marginal_a * marginal_b)) * (joint_abl - (marginal_a * marginal_b)) ** 2)
-
-                        else:
-                            estimate = np.nansum(joint_abl * np.log(joint_abl / (marginal_a * marginal_b)))
+                        estimate = np.sum(np.square(num_samples_child - e_val)) / e_val
 
                         if estimate >= self.delta(val):
                             r_subp, _, _ = self.rectangle_subpartition(rect, self.r)
-                            r_next.extend(r_subp)
+
+                            for r in r_subp:
+
+                                if len(r.samples_inside) > 2:
+                                    r_next.append(r)
+
+                                else:
+                                    self.rfinal.append(r)
+
                             added = True
                             break
                     
@@ -159,7 +158,7 @@ class AdaptiveAlgorithm:
             if len(self.current_partition) == 0:
                 break
 
-        return self.rfinal
+        return self.rfinal        
 
 
 class NonAdaptivePartition:

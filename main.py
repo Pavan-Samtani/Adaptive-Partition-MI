@@ -6,8 +6,8 @@ from scipy.stats import chi2
 
 
 def main():
-    sample_size = 1000
-    delta = lambda x: 0.03
+    sample_size = 5000
+    delta = lambda x: chi2.ppf(0.97, x ** 2 - 1)
     r = 2
     s = 2
 
@@ -20,7 +20,7 @@ def main():
     xy_sample = xy.sample(sample_size)
 
     # Adaptive algorithm
-    adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s, use_chi2=False)
+    adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s)
     final_partition = adaptive_algorithm.run()
 
     fig, ax = plt.subplots()

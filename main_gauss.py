@@ -7,6 +7,7 @@ from scipy.stats import chi2
 from distributions import MultivariateNormal
 from divergence_utils import kl_estimate
 from partition import AdaptiveAlgorithm, NonAdaptivePartition, Plane
+from table_gen import generate_table
 
 
 def main():
@@ -21,6 +22,8 @@ def main():
     na_mi_all_std = []
     ml_mi_all_std = []
 
+    results = {rho: [{ssize: [] for ssize in sample_sizes}, None] for rho in rhos}
+
     for rho in rhos:
 
         ci_mi_std = []
@@ -28,6 +31,8 @@ def main():
         ml_mi_std = []
 
         real_mi = - np.log(1 - rho ** 2) / 2
+
+        results[rho][1] = real_mi
 
         for sample_size in sample_sizes:
 
@@ -51,6 +56,8 @@ def main():
 
                 ml_mi_l.append(- np.log(1 - pearsonr(xy_sample[:, 0], xy_sample[:, 1])[0] ** 2) / 2)
 
+            results[rho][0][sample_size] = [np.mean(ml_mi_l), np.mean(ci_mi_l), np.mean(na_mi_l)]
+
             print("---------------------------------------------------------------------------------------------")
             print("rho: %.2f, Sample Size: %d, Real MI: %.4f" % (rho, sample_size, real_mi))
             print("Adaptive Partition MI: %.4f, NA Partition MI: %.4f, ML MI: %.4f" % 
@@ -63,6 +70,8 @@ def main():
         ci_mi_all_std.append(ci_mi_std)
         na_mi_all_std.append(na_mi_std)
         ml_mi_all_std.append(ml_mi_std)
+
+    generate_table(results)
 
     all_std = [ci_mi_all_std, na_mi_all_std, ml_mi_all_std]
     for i, _ in enumerate(["CI", "NA", "ML"]):

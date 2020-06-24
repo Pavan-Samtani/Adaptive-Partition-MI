@@ -99,6 +99,24 @@ class MultivariateNormal(Distribution):
     def get_sample(self, n: int) -> np.ndarray:
         return np.random.multivariate_normal(self.mean, self.cov, size=n)
 
+class BivariatePareto(Distribution):
+    """Bivariate Pareto distribution."""
+
+    def __init__(self, theta1, theta2, alpha):
+        super().__init__()
+        self.theta1 = theta1
+        self.theta2 = theta2
+        self.alpha = alpha
+
+    def get_sample(self, n):
+        u1 = np.random.random(size=n)
+        u2 = np.random.random(size=n)
+
+        y = self.theta2 / (u2 ** (1 / self.alpha))
+        x = self.theta1 + (self.theta1 / self.theta2) * y * ((1 / (u1 ** (1 / (self.alpha + 1)))) - 1)
+
+        return np.array(list(zip(x, y)))
+
 
 class RandomVar:
     """Defines a random variable with a given distribution."""
@@ -151,3 +169,21 @@ class Joint(RandomVar):
         Distribution.KEEP = False
 
         return np.array(xy)
+
+
+if __name__ == "__main__":
+    import numpy as np
+    import scipy.interpolate as interpolate
+    from matplotlib import pyplot as plt
+    import seaborn as sns
+
+
+    pareto = BivariatePareto(5, 2, 3)
+    xy_sample = pareto.sample(100)
+
+    fig, ax = plt.subplots()
+    x, y = zip(*xy_sample)
+    sns.kdeplot(np.array(x), np.array(y), ax=ax)
+    ax.set_xlim([5, 5 * 1.5])
+    ax.set_ylim([2, 2 * 1.5])
+    plt.show()

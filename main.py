@@ -1,5 +1,5 @@
 from distributions import Uniform, RandomVar, Joint
-from partition import AdaptiveAlgorithm
+from partition import AdaptiveAlgorithm, NonAdaptivePartition
 from matplotlib import pyplot as plt
 import numpy as np
 from scipy.stats import chi2
@@ -21,7 +21,12 @@ def main():
 
     # Adaptive algorithm
     adaptive_algorithm = AdaptiveAlgorithm(xy_sample, delta, r, s)
+
+    non_adaptive_part = NonAdaptivePartition(xy_sample, bins=[50, 50]).run()
     final_partition = adaptive_algorithm.run()
+
+    print(len(non_adaptive_part))
+    print(len(final_partition))
 
     fig, ax = plt.subplots()
     adaptive_algorithm.plot_data(ax, color='red', alpha=0.5, markersize=2)

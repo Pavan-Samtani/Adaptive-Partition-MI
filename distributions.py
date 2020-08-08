@@ -179,7 +179,7 @@ if __name__ == "__main__":
 
 
     pareto = BivariatePareto(5, 2, 3)
-    xy_sample = pareto.sample(100)
+    xy_sample = pareto.sample(10000)
 
     fig, ax = plt.subplots()
     x, y = zip(*xy_sample)

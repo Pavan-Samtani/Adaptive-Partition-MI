@@ -80,13 +80,15 @@ class AdaptiveAlgorithm:
 
         return smart_rects
 
-    def plot_partition(self, ax, partition):
+    @staticmethod
+    def plot_partition(ax, partition):
         for rect in partition:
             r_fig = rect.get_plot_rect()
             ax.add_collection(r_fig)
 
-    def plot_data(self, ax, *args, **kwargs):
-        ax.plot(*list(zip(*self.sample)), 'o', *args, **kwargs)
+    @staticmethod
+    def plot_data(sample, ax, *args, **kwargs):
+        ax.plot(*list(zip(*sample)), 'o', *args, **kwargs)
 
     def rectangle_subpartition(self, rect, partition_size):
         xmarg_rect = SmartRectangle(rect.xlim, self.plane.ylim, self.plane)
